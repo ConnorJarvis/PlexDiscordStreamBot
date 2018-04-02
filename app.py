@@ -41,6 +41,7 @@ async def on_message(message):
         name = message.content[len('!play'):].strip()
         movie = plex.library.section('Movies').get(name)
         await client.send_message(message.channel, 'Playing '+movie.title)
+        subprocess.run(["/root/bin/ffmpeg", "-re", "-i", movie.locations[0], "-c:v", "libx264", "-filter:v", "scale=1280:trunc(ow/a/2)*2", "-preset", "fast", "-minrate", "500k", "-maxrate", "3000k", "-bufsize", "6M", "-c:a", "libfdk_aac", "-b:a", "160k", "-f", "flv", "rtmp://stream.vangel.io/live/movie", "&"], shell=True)
     elif message.content.startswith('!stop'):
         subprocess.run(["killall", "ffmpeg"] )
         await client.send_message(message.channel, 'Stopping Movie')
