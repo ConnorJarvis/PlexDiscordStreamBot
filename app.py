@@ -115,7 +115,7 @@ async def on_message(message):
         await client.send_message(message.channel, 'Resuming Movie')
     # Print out commands available
     elif message.content.startswith('!help'):
-        await client.send_message(message.channel, '**!search {movie}** Search for a movie by name\r**!play {movie}** Play a movie. \*Use the exact name from the search command\*\r**!pause** Pause the move\r**!resume** Resume a paused movie\r**!stop** Stop a movie')
+        await client.send_message(message.channel, '**!search {movie}** Search for a movie by name\r**!play {movie}** Play a movie using the exact name from the search command\r**!pause** Pause the movie\r**!resume** Resume the paused movie\r**!stop** Stop the movie')
 
 # Start discord client
 client.run(config['discord']['Key'])

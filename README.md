@@ -11,3 +11,7 @@ Theoretically all you need to do to get started as far as I know:
 - `Fill out config.example.ini and save as config.ini`
 - `pip3 install -r requirements.txt `
 - `python3 app.py`
+
+
+## Example usage
+![Example usage](https://i.vangel.io/KZuaK.png)
