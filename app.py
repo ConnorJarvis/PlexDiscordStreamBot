@@ -20,21 +20,6 @@ ffmpegID = 0
 client = discord.Client()
 
 
-# Async function that checks every 10 seconds if the movie has finished playing
-async def processCheck(id):
-    # Loop until movie is done
-    while True:
-        # Try and pull an ffmpeg process id
-        # If it dies no ffmpeg is running therefore stream is dead
-        try:
-            if subprocess.check_output(["pgrep", "ffmpeg"]).strip().decode('ascii') != id:
-                return True
-        except:
-            return True
-        time.sleep(10)
-    return True
-
-
 # Just so you know your connected
 @client.event
 async def on_ready():
@@ -80,20 +65,16 @@ async def on_message(message):
             devnull = open('/dev/null', 'w')
             # Start streaming the movie using ffmpeg
             # Path to movie is pulled from the plex api because the paths are the same on both machines
-            subprocess.Popen(["/root/bin/ffmpeg", "-re", "-i", movie.locations[0], "-c:v", "libx264", "-filter:v", "scale=1280:trunc(ow/a/2)*2", "-preset", "fast", "-minrate", "500k", "-maxrate", "3000k", "-bufsize", "6M", "-c:a", "libfdk_aac", "-b:a", "160k", "-f", "flv", config['stream']['Destination']], stdout=devnull)
-            # Set the ffmpeg process id
-            ffmpegID = subprocess.check_output(["pgrep", "ffmpeg"]).strip().decode('ascii')
-            # Start monitoring for the movie to end
-            result = await processCheck(ffmpegID)
-            if result == True:
-                # Notifiy that the movie has finished
-                await client.send_message(message.channel, 'Movie has finished')
-                # Set the movie playing variable to false to allow a new movie to be streamed
-                moviePlaying = False
-                # Clear the game playing information
-                await client.change_presence(game=discord.Game(name=None))
+            subprocess.call(["/root/bin/ffmpeg", "-re", "-i", movie.locations[0], "-c:v", "libx264", "-filter:v", "scale=1280:trunc(ow/a/2)*2", "-preset", "fast", "-minrate", "500k", "-maxrate", "3000k", "-bufsize", "6M", "-c:a", "libfdk_aac", "-b:a", "160k", "-f", "flv", config['stream']['Destination']], stdout=devnull)
+            # Notifiy that the movie has finished
+            await client.send_message(message.channel, 'Movie has finished')
+            # Set the movie playing variable to false to allow a new movie to be streamed
+            moviePlaying = False
+            # Clear the game playing information
+            await client.change_presence(game=discord.Game(name=None))
     # Movie stop command
     elif message.content.startswith('!stop'):
+        ffmpegID = subprocess.check_output(["pgrep", "ffmpeg"]).strip().decode('ascii')
         # Kill the ffmpeg process
         subprocess.run(["kill",ffmpegID])
         # Clear the game playing information
@@ -104,11 +85,13 @@ async def on_message(message):
         await client.send_message(message.channel, 'Stopping Movie')
     # Pause command
     elif message.content.startswith('!pause'):
+        ffmpegID = subprocess.check_output(["pgrep", "ffmpeg"]).strip().decode('ascii')
         # Suspend the ffmpeg process
         subprocess.run(["kill", "-s", "SIGSTOP",ffmpegID])
         # Send message to confirm action
         await client.send_message(message.channel, 'Pausing Movie')
     elif message.content.startswith('!resume'):
+        ffmpegID = subprocess.check_output(["pgrep", "ffmpeg"]).strip().decode('ascii')
         # Resume the ffmpeg process
         subprocess.run(["kill", "-s", "SIGCONT", ffmpegID])
         # Send message to confirm action
