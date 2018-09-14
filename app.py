@@ -7,6 +7,8 @@ import os
 import time
 import string
 from multiprocessing import Process
+import validators
+from urllib.parse import urlsplit
 # Read in config
 config = configparser.ConfigParser()
 config.read(os.path.dirname(os.path.realpath(__file__)) +'/config.ini')
@@ -55,9 +57,12 @@ async def on_message(message):
         name = message.content[len('!search'):].strip()
         # Define the movie library
         movies = plex.library.section('Movies')
-        # Loop through the search results and add them to the message
-        for video in movies.search(name):
-            msg += '`'+video.title+'`\r'
+        if len(movies.search(name))>0:
+            # Loop through the search results and add them to the message
+            for video in movies.search(name):
+                msg += '`'+video.title+'`\r'
+        else:
+            msg = 'No movie found'
         # Send message with search results
         await client.send_message(message.channel, msg)
     # Message is command to play movie
@@ -117,14 +122,17 @@ async def on_message(message):
         name = message.content[len('!tvsearch'):].strip()
         # Define the tv library
         tv = plex.library.section('TV Shows')
-        # Loop through the search results and add them to the message
-        for video in tv.search(name):
-            msg = msg + "```\r"+video.title
-            for season in video.seasons():
-                msg = msg + "\rSeason "+ str(season.index)+"\r"
-                for episode in season.episodes():
-                    msg = msg + str(episode.index) + " "
-        msg = msg + '```'
+        if len(tv.search(name)) > 0:
+            # Loop through the search results and add them to the message
+            for video in tv.search(name):
+                msg = msg + "```\r"+video.title
+                for season in video.seasons():
+                    msg = msg + "\rSeason "+ str(season.index)+"\r"
+                    for episode in season.episodes():
+                        msg = msg + str(episode.index) + " "
+            msg = msg + '```'
+        else:
+            msg = 'No TV show found'
         # Send message with search results
         await client.send_message(message.channel, msg)
     elif message.content.startswith('!tvplay'):
@@ -138,25 +146,47 @@ async def on_message(message):
         name = message.content[len('!tvplay'):season].strip()
         seasonNumber = message.content[season+3:episode].strip()
         episodeNumber = message.content[episode+3:].strip()
-        print(seasonNumber)
-        print(episodeNumber)
         # Define the tv library
         tv = plex.library.section('TV Shows')
-        # Loop through the search results and add them to the message
-        for video in tv.search(name):
-            for season in video.seasons():
-                for episode in season.episodes():
-                    print("Season: "+ str(season.index)+"  "+str(seasonNumber))
-                    print("Episode: "+str(episode.index)+"  "+str(episodeNumber))
-                    if str(season.index) == str(seasonNumber) and str(episode.index) == str(episodeNumber):
-                        await client.change_presence(game=discord.Game(name=episode.title))
-                        # Set the global movie playing variable so there aren't duplicate movies trying to stream
-                        moviePlaying = True
-                        ## Send message to confirm action
-                        await client.send_message(message.channel, 'Streaming '+episode.title)
+        if len(tv.search(name)) > 0:
+            # Loop through the search results and add them to the message
+            for video in tv.search(name):
+                for season in video.seasons():
+                    for episode in season.episodes():
+                        if str(season.index) == str(seasonNumber) and str(episode.index) == str(episodeNumber):
+                            await client.change_presence(game=discord.Game(name=episode.title))
+                            # Set the global movie playing variable so there aren't duplicate movies trying to stream
+                            moviePlaying = True
+                            ## Send message to confirm action
+                            await client.send_message(message.channel, 'Streaming '+episode.title)
 
-                        p = Process(target=startMovie, args=(episode.locations[0],message.channel,))
-                        p.start()
+                            p = Process(target=startMovie, args=(episode.locations[0],message.channel,))
+                            p.start()
+        else:
+            await client.send_message(message.channel, 'No episode or TV show matching that name found')
+    elif message.content.startswith('!youtubeplay'):
+        name = message.content[len('!youtubeplay'):].strip()
+        if validators.url(name) == True:
+            parsed_uri = urlsplit(name)
+            if parsed_uri.hostname == "www.youtube.com" or parsed_uri.hostname == "youtube.com" or parsed_uri.hostname == "youtu.be"  or parsed_uri.hostname == "www.youtu.be":
+                await client.change_presence(game=discord.Game(name='Youtube'))
+                # Set the global movie playing variable so there aren't duplicate movies trying to stream
+                moviePlaying = True
+                ## Send message to confirm action
+                await client.send_message(message.channel, 'Streaming Youtube')
+                
+                devnull = open('/dev/null', 'w')
+                # Start streaming the movie using ffmpeg
+                # Path to movie is pulled from the plex api because the paths are the same on both machines
+                command = "youtube-dl -f 'best[ext=mp4]' -o - \""+name+"\" | ffmpeg -re -i pipe:0 -c:v copy -preset fast -c:a copy -f flv "+ config['stream']['Destination']
+                print(command)
+                subprocess.call(command.split(), shell=False)
+        else:
+            await client.send_message(message.channel, 'Invalid url')
+
+
+       
+
 # Start discord client
 client.run(config['discord']['Key'])
 
