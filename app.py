@@ -114,7 +114,7 @@ async def on_message(message):
         await client.send_message(message.channel, 'Resuming Stream')
     # Print out commands available
     elif message.content.startswith('!help'):
-        await client.send_message(message.channel, '**!search {movie}** Search for a movie by name\r**!play {movie}** Play a movie using the exact name from the search command\r**!pause** Pause the movie\r**!resume** Resume the paused movie\r**!stop** Stop the movie')
+        await client.send_message(message.channel, '**!search {movie}** Search for a movie by name\r**!play {movie}** Play a movie using the exact name from the search command\r**!pause** Pause the movie\r**!resume** Resume the paused movie\r**!stop** Stop the movie\r**!tvsearch {tv_name}** Search for a tv show by name\r**!tvplay {tv_name} -s={season_number} -e={episode_number}** Play an episode of TV')
     elif message.content.startswith('!tvsearch'):
         # Define blank message
         msg = ''
@@ -164,25 +164,25 @@ async def on_message(message):
                             p.start()
         else:
             await client.send_message(message.channel, 'No episode or TV show matching that name found')
-    elif message.content.startswith('!youtubeplay'):
-        name = message.content[len('!youtubeplay'):].strip()
-        if validators.url(name) == True:
-            parsed_uri = urlsplit(name)
-            if parsed_uri.hostname == "www.youtube.com" or parsed_uri.hostname == "youtube.com" or parsed_uri.hostname == "youtu.be"  or parsed_uri.hostname == "www.youtu.be":
-                await client.change_presence(game=discord.Game(name='Youtube'))
-                # Set the global movie playing variable so there aren't duplicate movies trying to stream
-                moviePlaying = True
-                ## Send message to confirm action
-                await client.send_message(message.channel, 'Streaming Youtube')
+    # elif message.content.startswith('!youtubeplay'):
+    #     name = message.content[len('!youtubeplay'):].strip()
+    #     if validators.url(name) == True:
+    #         parsed_uri = urlsplit(name)
+    #         if parsed_uri.hostname == "www.youtube.com" or parsed_uri.hostname == "youtube.com" or parsed_uri.hostname == "youtu.be"  or parsed_uri.hostname == "www.youtu.be":
+    #             await client.change_presence(game=discord.Game(name='Youtube'))
+    #             # Set the global movie playing variable so there aren't duplicate movies trying to stream
+    #             moviePlaying = True
+    #             ## Send message to confirm action
+    #             await client.send_message(message.channel, 'Streaming Youtube')
                 
-                devnull = open('/dev/null', 'w')
-                # Start streaming the movie using ffmpeg
-                # Path to movie is pulled from the plex api because the paths are the same on both machines
-                command = "youtube-dl -f 'best[ext=mp4]' -o - \""+name+"\" | ffmpeg -re -i pipe:0 -c:v copy -preset fast -c:a copy -f flv "+ config['stream']['Destination']
-                print(command)
-                subprocess.call(command.split(), shell=False)
-        else:
-            await client.send_message(message.channel, 'Invalid url')
+    #             devnull = open('/dev/null', 'w')
+    #             # Start streaming the movie using ffmpeg
+    #             # Path to movie is pulled from the plex api because the paths are the same on both machines
+    #             command = "youtube-dl -f 'best[ext=mp4]' -o - \""+name+"\" | ffmpeg -re -i pipe:0 -c:v copy -preset fast -c:a copy -f flv "+ config['stream']['Destination']
+    #             print(command)
+    #             subprocess.call(command.split(), shell=False)
+    #     else:
+    #         await client.send_message(message.channel, 'Invalid url')
 
 
        
