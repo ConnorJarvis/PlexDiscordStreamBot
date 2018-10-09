@@ -12,11 +12,10 @@ from urllib.parse import urlsplit
 # Read in config
 config = configparser.ConfigParser()
 config.read(os.path.dirname(os.path.realpath(__file__)) +'/config.ini')
-
+os.chdir(os.path.dirname(os.path.realpath(__file__)))
 # Connect to plex server
 account = MyPlexAccount(config['plex']['Username'], config['plex']['Password'])
 plex = account.resource(config['plex']['Server']).connect() 
-
 # Global variables to handle state
 videoPlaying = False
 ffmpegID = 0
@@ -166,8 +165,25 @@ async def on_message(message):
             await client.send_message(message.channel, 'No episode or TV show matching that name found')
 
     elif message.content.startswith('!update'):
-        out = subprocess.check_output(["git", "rev-list", "--count", "origin/master...master"])
-        await client.send_message(message.channel, 'You are '+str(out.decode("utf-8")).rstrip()+' commits behind')
+        authorizedUsers = config['discord']['AuthorizedUsers'].split(',')
+        userID = message.author.id
+        if userID in authorizedUsers:
+            subprocess.run(["git", "fetch", "origin"])
+            out = subprocess.check_output(["git", "rev-list", "--count", "origin/master...master"])
+            commitsBehind = int(str(out.decode("utf-8")).rstrip())
+            if commitsBehind > 0 and videoPlaying == False:
+                await client.send_message(message.channel, 'You are '+str(out.decode("utf-8")).rstrip()+' commits behind')
+                await client.send_message(message.channel, 'Updating')
+                videoPlaying = True
+                subprocess.run(["git", "reset", "--hard", "origin/master"])
+                subprocess.run(["systemctl", "restart", "videobot"])
+            elif commitsBehind > 0 and videoPlaying == True:
+                await client.send_message(message.channel, 'You are '+str(out.decode("utf-8")).rstrip()+' commits behind')
+                await client.send_message(message.channel, 'Run this command when a video isn\'t streaming to update')
+            else:
+                await client.send_message(message.channel, 'Videobot is up to date')
+        else:
+            await client.send_message(message.channel, 'Unauthorized User')
     # elif message.content.startswith('!youtubeplay'):
     #     name = message.content[len('!youtubeplay'):].strip()
     #     if validators.url(name) == True:

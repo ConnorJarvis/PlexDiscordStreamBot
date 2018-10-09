@@ -16,3 +16,5 @@ If the path to the media is different on the plex server compared to the stream 
 
 `PLEX_FOLDER:STREAM_FOLDER,`
 
+To update your videobot run `!update` only users specificed in the `AuthorizedUsers` config option are allowed to run this command. Enter user IDs as a comma seperated list
+
