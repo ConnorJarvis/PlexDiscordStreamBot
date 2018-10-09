@@ -18,27 +18,21 @@ account = MyPlexAccount(config['plex']['Username'], config['plex']['Password'])
 plex = account.resource(config['plex']['Server']).connect() 
 
 # Global variables to handle state
-moviePlaying = False
+videoPlaying = False
 ffmpegID = 0
 # Define discord client
-client = discord.Client()
+client = discord.Client()    
 
-def startMovie(path, channel):
-    devnull = open('/dev/null', 'w')
-
+def startStream(message,path):
+    global client
+    # Update path so its accurate on the stream server
     for x in config['plex']['RemappedFolders'].split(","):
         oldPath, newPath = x.split(":")
         path = path.replace(oldPath, newPath)
+        
+    # Start streaming the video using ffmpeg
+    subprocess.call([config['stream']['FFMPEGLocation'], "-re", "-i", path, "-c:v", "libx264", "-filter:v", "scale=1280:trunc(ow/a/2)*2", "-preset", "fast", "-minrate", "500k", "-maxrate", "3000k", "-bufsize", "6M", "-c:a", "libfdk_aac", "-b:a", "160k", "-f", "flv", config['stream']['Destination']])
 
-    # Start streaming the movie using ffmpeg
-    # Path to movie is pulled from the plex api because the paths are the same on both machines
-    subprocess.call([config['stream']['FFMPEGLocation'], "-re", "-i", path, "-c:v", "libx264", "-filter:v", "scale=1280:trunc(ow/a/2)*2", "-preset", "fast", "-minrate", "500k", "-maxrate", "3000k", "-bufsize", "6M", "-c:a", "libfdk_aac", "-b:a", "160k", "-f", "flv", config['stream']['Destination']], stdout=devnull)
-    # Notifiy that the movie has finished
-    client.send_message(channel, 'Stream has finished')
-    # Set the movie playing variable to false to allow a new movie to be streamed
-    moviePlaying = False
-    # Clear the game playing information
-    client.change_presence(game=discord.Game(name=None))
 
 
 # Just so you know your connected
@@ -48,11 +42,12 @@ async def on_ready():
     print(client.user.name)
     print(client.user.id)
     print('------')
+    await client.change_presence(game=discord.Game(name=None))
 
 # On Discord message
 @client.event
 async def on_message(message):
-    global moviePlaying
+    global videoPlaying
     global ffmpegID
     # Message is for searching
     if message.content.startswith('!search'):
@@ -73,7 +68,7 @@ async def on_message(message):
     # Message is command to play movie
     elif message.content.startswith('!play'):
         # If a movie is already playing discard message and notify
-        if moviePlaying == True:
+        if videoPlaying == True:
             await client.send_message(message.channel, 'Stream is already playing')
         else:
             msg = ''
@@ -82,26 +77,24 @@ async def on_message(message):
             movie = plex.library.section('Movies').get(name)
             # Set the game the bot is playing to the movie name
             await client.change_presence(game=discord.Game(name=movie.title))
-            # Set the global movie playing variable so there aren't duplicate movies trying to stream
-            moviePlaying = True
-            ## Send message to confirm action
+            # Set the global movie playing variable so there aren't duplicate videos trying to stream
+            videoPlaying = True
+            # Send message to confirm action
             await client.send_message(message.channel, 'Streaming '+movie.title)
-
-            p = Process(target=startMovie, args=(movie.locations[0],message.channel,))
+            p = Process(target=startStream, args=(message,movie.locations[0],))
             p.start()
-
-    # Movie stop command
+    # Video stop command
     elif message.content.startswith('!stop'):
         try:
             ffmpegID = subprocess.check_output(["pgrep", "ffmpeg"]).strip().decode('ascii')
             # Kill the ffmpeg process
             subprocess.run(["kill",ffmpegID])
         except:
-            print("No movie playing")
+            print("No video playing")
         # Clear the game playing information
         await client.change_presence(game=discord.Game(name=None))
-        # Set the movie playing variable to false to allow a new movie to be streamed
-        moviePlaying = False
+        # Set the video playing variable to false to allow a new video to be streamed
+        videoPlaying = False
         # Send message to confirm action
         await client.send_message(message.channel, 'Stopping Stream')
     # Pause command
@@ -123,7 +116,7 @@ async def on_message(message):
     elif message.content.startswith('!tvsearch'):
         # Define blank message
         msg = ''
-        # Get the name of the movie from the message
+        # Get the name of the video from the message
         name = message.content[len('!tvsearch'):].strip()
         # Define the tv library
         tv = plex.library.section('TV Shows')
@@ -143,9 +136,7 @@ async def on_message(message):
     elif message.content.startswith('!tvplay'):
         # Define blank message
         msg = ''
-        # Get the name of the movie from the message
-        
-
+        # Get the name of tv from the message
         season = message.content.find("-s=")
         episode = message.content.find("-e=")
         name = message.content[len('!tvplay'):season].strip()
@@ -153,22 +144,30 @@ async def on_message(message):
         episodeNumber = message.content[episode+3:].strip()
         # Define the tv library
         tv = plex.library.section('TV Shows')
-        if len(tv.search(name)) > 0:
+        searchResult = tv.search(name)
+        print(searchResult)
+        if len(searchResult) > 1:
+            await client.send_message(message.channel, 'Refine search result to one show')
+        elif len(searchResult) > 0:
             # Loop through the search results and add them to the message
-            for video in tv.search(name):
+            for video in searchResult:
                 for season in video.seasons():
                     for episode in season.episodes():
                         if str(season.index) == str(seasonNumber) and str(episode.index) == str(episodeNumber):
                             await client.change_presence(game=discord.Game(name=episode.title))
-                            # Set the global movie playing variable so there aren't duplicate movies trying to stream
-                            moviePlaying = True
+                            # Set the global video playing variable so there aren't duplicate videos trying to stream
+                            videoPlaying = True
                             ## Send message to confirm action
                             await client.send_message(message.channel, 'Streaming '+episode.title)
-
-                            p = Process(target=startMovie, args=(episode.locations[0],message.channel,))
+                            p = Process(target=startStream, args=(message,episode.locations[0],))
                             p.start()
+           
         else:
             await client.send_message(message.channel, 'No episode or TV show matching that name found')
+
+    elif message.content.startswith('!update'):
+        out = subprocess.check_output(["git", "rev-list", "--count", "origin/master...master"])
+        await client.send_message(message.channel, 'You are '+str(out.decode("utf-8")).rstrip()+' commits behind')
     # elif message.content.startswith('!youtubeplay'):
     #     name = message.content[len('!youtubeplay'):].strip()
     #     if validators.url(name) == True:
@@ -176,7 +175,7 @@ async def on_message(message):
     #         if parsed_uri.hostname == "www.youtube.com" or parsed_uri.hostname == "youtube.com" or parsed_uri.hostname == "youtu.be"  or parsed_uri.hostname == "www.youtu.be":
     #             await client.change_presence(game=discord.Game(name='Youtube'))
     #             # Set the global movie playing variable so there aren't duplicate movies trying to stream
-    #             moviePlaying = True
+    #             videoPlaying = True
     #             ## Send message to confirm action
     #             await client.send_message(message.channel, 'Streaming Youtube')
                 
@@ -188,9 +187,6 @@ async def on_message(message):
     #             subprocess.call(command.split(), shell=False)
     #     else:
     #         await client.send_message(message.channel, 'Invalid url')
-
-
-       
 
 # Start discord client
 client.run(config['discord']['Key'])
