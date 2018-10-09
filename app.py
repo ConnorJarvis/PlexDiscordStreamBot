@@ -25,9 +25,14 @@ client = discord.Client()
 
 def startMovie(path, channel):
     devnull = open('/dev/null', 'w')
+
+    for x in config['plex']['RemappedFolders'].split(","):
+        oldPath, newPath = x.split(":")
+        path = path.replace(oldPath, newPath)
+
     # Start streaming the movie using ffmpeg
     # Path to movie is pulled from the plex api because the paths are the same on both machines
-    subprocess.call(["/root/bin/ffmpeg", "-re", "-i", path, "-c:v", "libx264", "-filter:v", "scale=1280:trunc(ow/a/2)*2", "-preset", "fast", "-minrate", "500k", "-maxrate", "3000k", "-bufsize", "6M", "-c:a", "libfdk_aac", "-b:a", "160k", "-f", "flv", config['stream']['Destination']], stdout=devnull)
+    subprocess.call([config['stream']['FFMPEGLocation'], "-re", "-i", path, "-c:v", "libx264", "-filter:v", "scale=1280:trunc(ow/a/2)*2", "-preset", "fast", "-minrate", "500k", "-maxrate", "3000k", "-bufsize", "6M", "-c:a", "libfdk_aac", "-b:a", "160k", "-f", "flv", config['stream']['Destination']], stdout=devnull)
     # Notifiy that the movie has finished
     client.send_message(channel, 'Stream has finished')
     # Set the movie playing variable to false to allow a new movie to be streamed
