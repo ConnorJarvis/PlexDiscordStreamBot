@@ -9,6 +9,7 @@ import string
 from multiprocessing import Process
 import validators
 from urllib.parse import urlsplit
+import secrets
 # Read in config
 config = configparser.ConfigParser()
 config.read(os.path.dirname(os.path.realpath(__file__)) +'/config.ini')
@@ -22,15 +23,15 @@ ffmpegID = 0
 # Define discord client
 client = discord.Client()    
 
-def startStream(message,path):
+def startStream(message,path,id):
     global client
     # Update path so its accurate on the stream server
     for x in config['plex']['RemappedFolders'].split(","):
         oldPath, newPath = x.split(":")
         path = path.replace(oldPath, newPath)
-        
+    url = config['stream']['Destination'] + id
     # Start streaming the video using ffmpeg
-    subprocess.call([config['stream']['FFMPEGLocation'], "-re", "-i", path, "-c:v", "libx264", "-filter:v", "scale=1280:trunc(ow/a/2)*2", "-preset", "fast", "-minrate", "500k", "-maxrate", "3000k", "-bufsize", "6M", "-c:a", "libfdk_aac", "-b:a", "160k", "-f", "flv", config['stream']['Destination']])
+    subprocess.call([config['stream']['FFMPEGLocation'], "-re", "-i", path, "-c:v", "libx264", "-filter:v", "scale=1280:trunc(ow/a/2)*2", "-preset", "fast", "-minrate", "500k", "-maxrate", "3500k", "-bufsize", "12M", "-c:a", "libfdk_aac", "-b:a", "160k", "-f", "flv", url ])
 
 
 
@@ -78,9 +79,10 @@ async def on_message(message):
             await client.change_presence(game=discord.Game(name=movie.title))
             # Set the global movie playing variable so there aren't duplicate videos trying to stream
             videoPlaying = True
+            streamID = secrets.token_urlsafe(8)
             # Send message to confirm action
-            await client.send_message(message.channel, 'Streaming '+movie.title)
-            p = Process(target=startStream, args=(message,movie.locations[0],))
+            await client.send_message(message.channel, 'Streaming '+movie.title+'\rhttps://stream.vangel.io/?='+streamID)
+            p = Process(target=startStream, args=(message,movie.locations[0],streamID,))
             p.start()
     # Video stop command
     elif message.content.startswith('!stop'):
@@ -156,9 +158,10 @@ async def on_message(message):
                             await client.change_presence(game=discord.Game(name=episode.title))
                             # Set the global video playing variable so there aren't duplicate videos trying to stream
                             videoPlaying = True
+                            streamID = secrets.token_urlsafe(8)
                             ## Send message to confirm action
-                            await client.send_message(message.channel, 'Streaming '+episode.title)
-                            p = Process(target=startStream, args=(message,episode.locations[0],))
+                            await client.send_message(message.channel, 'Streaming '+episode.title+'\rhttps://stream.vangel.io/?='+streamID)
+                            p = Process(target=startStream, args=(message,episode.locations[0],streamID,))
                             p.start()
            
         else:
