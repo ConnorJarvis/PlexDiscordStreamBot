@@ -74,7 +74,13 @@ async def on_message(message):
             msg = ''
             name = message.content[len('!play'):].strip()
             # Get movie information from plex
-            movie = plex.library.section('Movies').get(name)
+            try:
+                movie = plex.library.section('Movies').get(name)
+            except:
+                search = plex.library.section('Movies').search(name)
+                if len(search) == 1:
+                    movie = search[0]
+      
             # Set the game the bot is playing to the movie name
             await client.change_presence(game=discord.Game(name=movie.title))
             # Set the global movie playing variable so there aren't duplicate videos trying to stream
