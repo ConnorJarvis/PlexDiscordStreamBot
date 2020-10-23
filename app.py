@@ -42,13 +42,15 @@ async def on_ready():
     print(client.user.name)
     print(client.user.id)
     print('------')
-    await client.change_presence(game=discord.Game(name=None))
+    game = discord.Game(None)
+    await client.change_presence(status=discord.Status.idle, activity=game)
 
 # On Discord message
 @client.event
 async def on_message(message):
     global videoPlaying
     global ffmpegID
+    channel = message.channel
     # Message is for searching
     if message.content.startswith('!search'):
         # Define blank message
@@ -64,12 +66,12 @@ async def on_message(message):
         else:
             msg = 'No movie found'
         # Send message with search results
-        await client.send_message(message.channel, msg)
+        await channel.send(msg)
     # Message is command to play movie
     elif message.content.startswith('!play'):
         # If a movie is already playing discard message and notify
         if videoPlaying == True:
-            await client.send_message(message.channel, 'Stream is already playing')
+            await channel.send('Stream is already playing')
         else:
             msg = ''
             name = message.content[len('!play'):].strip()
@@ -82,12 +84,14 @@ async def on_message(message):
                     movie = search[0]
       
             # Set the game the bot is playing to the movie name
-            await client.change_presence(game=discord.Game(name=movie.title))
+            game = discord.Game(movie.title)
+            await client.change_presence(status=discord.Status.idle, activity=game)
+
             # Set the global movie playing variable so there aren't duplicate videos trying to stream
             videoPlaying = True
             streamID = secrets.token_urlsafe(8)
             # Send message to confirm action
-            await client.send_message(message.channel, 'Streaming '+movie.title+'\rhttps://stream.vangel.io/?='+streamID)
+            await channel.send('Streaming '+movie.title+'\rhttps://stream.vangel.io/?='+streamID)
             p = Process(target=startStream, args=(message,movie.locations[0],streamID,))
             p.start()
     # Video stop command
@@ -99,27 +103,28 @@ async def on_message(message):
         except:
             print("No video playing")
         # Clear the game playing information
-        await client.change_presence(game=discord.Game(name=None))
+        game = discord.Game(None)
+        await client.change_presence(status=discord.Status.idle, activity=game)
         # Set the video playing variable to false to allow a new video to be streamed
         videoPlaying = False
         # Send message to confirm action
-        await client.send_message(message.channel, 'Stopping Stream')
+        await channel.send('Stopping Stream')
     # Pause command
     elif message.content.startswith('!pause'):
         ffmpegID = subprocess.check_output(["pgrep", "ffmpeg"]).strip().decode('ascii')
         # Suspend the ffmpeg process
         subprocess.run(["kill", "-s", "SIGSTOP",ffmpegID])
         # Send message to confirm action
-        await client.send_message(message.channel, 'Pausing Stream')
+        await channel.send('Pausing Stream')
     elif message.content.startswith('!resume'):
         ffmpegID = subprocess.check_output(["pgrep", "ffmpeg"]).strip().decode('ascii')
         # Resume the ffmpeg process
         subprocess.run(["kill", "-s", "SIGCONT", ffmpegID])
         # Send message to confirm action
-        await client.send_message(message.channel, 'Resuming Stream')
+        await channel.send('Resuming Stream')
     # Print out commands available
     elif message.content.startswith('!help'):
-        await client.send_message(message.channel, '**!search {movie}** Search for a movie by name\r**!play {movie}** Play a movie using the exact name from the search command\r**!pause** Pause the movie\r**!resume** Resume the paused movie\r**!stop** Stop the movie\r**!tvsearch {tv_name}** Search for a tv show by name\r**!tvplay {tv_name} -s={season_number} -e={episode_number}** Play an episode of TV')
+        await channel.send('**!search {movie}** Search for a movie by name\r**!play {movie}** Play a movie using the exact name from the search command\r**!pause** Pause the movie\r**!resume** Resume the paused movie\r**!stop** Stop the movie\r**!tvsearch {tv_name}** Search for a tv show by name\r**!tvplay {tv_name} -s={season_number} -e={episode_number}** Play an episode of TV')
     elif message.content.startswith('!tvsearch'):
         # Define blank message
         msg = ''
@@ -139,7 +144,7 @@ async def on_message(message):
         else:
             msg = 'No TV show found'
         # Send message with search results
-        await client.send_message(message.channel, msg)
+        await channel.send(msg)
     elif message.content.startswith('!tvplay'):
         # Define blank message
         msg = ''
@@ -154,25 +159,26 @@ async def on_message(message):
         searchResult = tv.search(name)
         print(searchResult)
         if len(searchResult) > 1:
-            await client.send_message(message.channel, 'Refine search result to one show')
+            await channel.send('Refine search result to one show')
         elif len(searchResult) > 0:
             # Loop through the search results and add them to the message
             for video in searchResult:
                 for season in video.seasons():
                     for episode in season.episodes():
                         if str(season.index) == str(seasonNumber) and str(episode.index) == str(episodeNumber):
-                            await client.change_presence(game=discord.Game(name=episode.title))
+                            game = discord.Game(episode.title)
+                            await client.change_presence(status=discord.Status.idle, activity=game)
                             # Set the global video playing variable so there aren't duplicate videos trying to stream
                             videoPlaying = True
                             streamID = secrets.token_urlsafe(8)
                             ## Send message to confirm action
-                            await client.send_message(message.channel, 'Streaming '+episode.title+'\rhttps://stream.vangel.io/?='+streamID)
+                            await channel.send('Streaming '+episode.title+'\rhttps://stream.vangel.io/?='+streamID)
                             p = Process(target=startStream, args=(message,episode.locations[0],streamID,))
                             p.start()
            
         else:
-            await client.send_message(message.channel, 'No episode or TV show matching that name found')
-
+            await channel.send('No episode or TV show matching that name found')
+channel.send
     elif message.content.startswith('!update'):
         authorizedUsers = config['discord']['AuthorizedUsers'].split(',')
         userID = message.author.id
@@ -181,18 +187,18 @@ async def on_message(message):
             out = subprocess.check_output(["git", "rev-list", "--count", "origin/master...master"])
             commitsBehind = int(str(out.decode("utf-8")).rstrip())
             if commitsBehind > 0 and videoPlaying == False:
-                await client.send_message(message.channel, 'You are '+str(out.decode("utf-8")).rstrip()+' commits behind')
-                await client.send_message(message.channel, 'Updating')
+                await channel.send('You are '+str(out.decode("utf-8")).rstrip()+' commits behind')
+                await channel.send('Updating')
                 videoPlaying = True
                 subprocess.run(["git", "reset", "--hard", "origin/master"])
                 subprocess.run(["systemctl", "restart", "videobot"])
             elif commitsBehind > 0 and videoPlaying == True:
-                await client.send_message(message.channel, 'You are '+str(out.decode("utf-8")).rstrip()+' commits behind')
-                await client.send_message(message.channel, 'Run this command when a video isn\'t streaming to update')
+                await channel.send('You are '+str(out.decode("utf-8")).rstrip()+' commits behind')
+                await channel.send('Run this command when a video isn\'t streaming to update')
             else:
-                await client.send_message(message.channel, 'Videobot is up to date')
+                await channel.send('Videobot is up to date')
         else:
-            await client.send_message(message.channel, 'Unauthorized User')
+            await channel.send('Unauthorized User')
     # elif message.content.startswith('!youtubeplay'):
     #     name = message.content[len('!youtubeplay'):].strip()
     #     if validators.url(name) == True:
@@ -202,7 +208,7 @@ async def on_message(message):
     #             # Set the global movie playing variable so there aren't duplicate movies trying to stream
     #             videoPlaying = True
     #             ## Send message to confirm action
-    #             await client.send_message(message.channel, 'Streaming Youtube')
+    #             await channel.send('Streaming Youtube')
                 
     #             devnull = open('/dev/null', 'w')
     #             # Start streaming the movie using ffmpeg
@@ -211,7 +217,7 @@ async def on_message(message):
     #             print(command)
     #             subprocess.call(command.split(), shell=False)
     #     else:
-    #         await client.send_message(message.channel, 'Invalid url')
+    #         await channel.send('Invalid url')
 
 # Start discord client
 client.run(config['discord']['Key'])
