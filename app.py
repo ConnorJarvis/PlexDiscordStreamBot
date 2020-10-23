@@ -42,8 +42,8 @@ async def on_ready():
     print(client.user.name)
     print(client.user.id)
     print('------')
-    game = discord.Game(None)
-    await client.change_presence(status=discord.Status.idle, activity=game)
+
+    await client.change_presence(status=discord.Status.idle, activity=None)
 
 # On Discord message
 @client.event
@@ -103,8 +103,7 @@ async def on_message(message):
         except:
             print("No video playing")
         # Clear the game playing information
-        game = discord.Game(None)
-        await client.change_presence(status=discord.Status.idle, activity=game)
+        await client.change_presence(status=discord.Status.idle, activity=None)
         # Set the video playing variable to false to allow a new video to be streamed
         videoPlaying = False
         # Send message to confirm action
@@ -178,7 +177,6 @@ async def on_message(message):
            
         else:
             await channel.send('No episode or TV show matching that name found')
-channel.send
     elif message.content.startswith('!update'):
         authorizedUsers = config['discord']['AuthorizedUsers'].split(',')
         userID = message.author.id
