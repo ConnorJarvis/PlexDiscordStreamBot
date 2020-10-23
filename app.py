@@ -180,7 +180,7 @@ async def on_message(message):
     elif message.content.startswith('!update'):
         authorizedUsers = config['discord']['AuthorizedUsers'].split(',')
         userID = message.author.id
-        if userID in authorizedUsers:
+        if str(userID) in authorizedUsers:
             subprocess.run(["git", "fetch", "origin"])
             out = subprocess.check_output(["git", "rev-list", "--count", "origin/master...master"])
             commitsBehind = int(str(out.decode("utf-8")).rstrip())
