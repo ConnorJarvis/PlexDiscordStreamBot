@@ -51,6 +51,9 @@ async def on_message(message):
     global videoPlaying
     global ffmpegID
     channel = message.channel
+    
+    if len(config['discord']['AllowedChannels'])>0 and str(channel.id) not in config['discord']['AllowedChannels'].split(','):
+        return
     # Message is for searching
     if message.content.startswith('!search'):
         # Define blank message
